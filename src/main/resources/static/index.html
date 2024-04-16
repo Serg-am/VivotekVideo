@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Streaming</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+<img id="video" src="" alt="Video">
+
+<script>
+    var stompClient = null;
+
+    function connect() {
+        var socket = new SockJS('/video-streaming');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/topic/video', function(response) {
+                var image = document.getElementById('video');
+                image.src = 'data:image/jpeg;base64,' + response.body;
+            });
+        });
+    }
+
+    connect();
+</script>
+</body>
+</html>
