@@ -15,12 +15,16 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Base64;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 @Controller
 public class VideoStreamingController {
 
-    private static final int IMAGE_WIDTH = 1280;
-    private static final int IMAGE_HEIGHT = 800;
+    private static final int FRAME_RATE = 30; // Количество кадров в секунду
+    private static final int QUEUE_SIZE = 100;
+
+    private BlockingQueue<String> frameQueue = new ArrayBlockingQueue<>(QUEUE_SIZE);
 
     @Value("${rtsp.url}")
     private String rtspUrl;
@@ -39,9 +43,8 @@ public class VideoStreamingController {
         grabber.start();
     }
 
-    @Scheduled(fixedRate = 10)
+    @Scheduled(fixedRate = 33)
     private void streamVideo() throws IOException {
-        System.out.println("Gooo WebSocket");
         Frame frame = grabber.grabImage();
         if (frame != null) {
             Java2DFrameConverter converter = new Java2DFrameConverter();
@@ -49,8 +52,15 @@ public class VideoStreamingController {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ImageIO.write(bufferedImage, "jpg", out);
             String base64Image = Base64.getEncoder().encodeToString(out.toByteArray());
-            messagingTemplate.convertAndSend("/topic/video", base64Image);
-            System.out.println("Sending image data over WebSocket");
+            frameQueue.offer(base64Image);
+        }
+    }
+
+    @Scheduled(fixedDelay = 1000 / FRAME_RATE)
+    private void sendFrames() {
+        String frame = frameQueue.poll();
+        if (frame != null) {
+            messagingTemplate.convertAndSend("/topic/video", frame);
         }
     }
 }
